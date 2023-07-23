@@ -1,1 +1,2 @@
-# BDD-UI-framework
+# cucumber-selenium-framework
+This repository provides a template for setting up a Selenium Java Cucumber framework for both UI and API testing. This framework is built on top of Selenium, Java, and Cucumber, combining the power of behavior-driven development (BDD) and page object pattern for writing test scenarios in a more human-readable format. The framework also includes generic methods for common UI interactions like clicking elements and entering text, making it easier to write and maintain test scripts.
