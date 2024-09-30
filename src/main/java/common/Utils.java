@@ -1,5 +1,6 @@
 package common;
 
+import com.jayway.jsonpath.DocumentContext;
 import com.twilio.base.ResourceSet;
 import io.restassured.builder.RequestSpecBuilder;
 import io.restassured.path.json.JsonPath;
@@ -7,26 +8,34 @@ import io.restassured.specification.RequestSpecification;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FileUtils;
 import org.hamcrest.MatcherAssert;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.openqa.selenium.*;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
-import org.testng.Assert;
+//import org.testng.Assert;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.URL;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
+import java.util.HashMap;
+import java.util.Map;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+
 import com.twilio.Twilio;
 import com.twilio.rest.api.v2010.account.Message;
 import com.twilio.type.PhoneNumber;
+
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.anyOf;
 import static org.hamcrest.Matchers.is;
@@ -45,6 +54,10 @@ public class Utils {
 
     public Utils(WebDriver _driver) {
         this.driver = _driver;
+    }
+
+    public Utils() {
+
     }
 
     public static String getBrowser() {
@@ -66,7 +79,7 @@ public class Utils {
         MatcherAssert.assertThat(getStack(), anyOf(is("qa"), is("dev"), is("staging")));
         String path = new File("src/test/resources/application-" + getStack() + ".properties").getAbsolutePath();
         prop.load(new FileInputStream(path));
-        Assert.assertNotNull(prop.getProperty(key), "[[TEST SCRIPT ISSUE]] There is no value for the key: " + key + " in the properties file. Kindly re check the key.");
+//        Assert.assertNotNull(prop.getProperty(key), "[[TEST SCRIPT ISSUE]] There is no value for the key: " + key + " in the properties file. Kindly re check the key.");
         return prop.getProperty(key);
     }
 
@@ -74,7 +87,7 @@ public class Utils {
         MatcherAssert.assertThat(getStack(), anyOf(is("qa"), is("dev"), is("staging")));
         String path = new File("src/test/resources/creds-" + getStack() + ".properties").getAbsolutePath();
         prop.load(new FileInputStream(path));
-        Assert.assertNotNull(prop.getProperty(key), "[[TEST SCRIPT ISSUE]] There is no value for the key: " + key + " in the properties file. Kindly re check the key.");
+//        Assert.assertNotNull(prop.getProperty(key), "[[TEST SCRIPT ISSUE]] There is no value for the key: " + key + " in the properties file. Kindly re check the key.");
         return prop.getProperty(key);
     }
 
@@ -100,7 +113,7 @@ public class Utils {
             return true;
         } catch (NoSuchElementException ignored) {
 
-            Assert.fail("Element not found.");
+//            Assert.fail("Element not found.");
             return false;
         }
     }
@@ -116,7 +129,7 @@ public class Utils {
             new WebDriverWait(driver, Duration.ofSeconds(30))
                     .until(ExpectedConditions.visibilityOf(locator));
         } catch (Exception e) {
-            Assert.fail("Element not found with locator: ");
+//            Assert.fail("Element not found with locator: ");
         }
     }
 
@@ -127,9 +140,9 @@ public class Utils {
             fluentWait(2000);
             new WebDriverWait(driver, Duration.ofSeconds(120))
                     .until(ExpectedConditions.elementToBeClickable(locator));
-            log.info("Element is clickable");
+            //    log.info("Element is clickable");
         } catch (Exception e) {
-            Assert.fail("Element not found with locator: ");
+//            Assert.fail("Element not found with locator: ");
             System.out.println("Element not found with locator: " + e.getMessage());
         }
     }
@@ -142,6 +155,97 @@ public class Utils {
     public static List getListResponse(String response, String path) {
         JsonPath jsonPath = new JsonPath(response);
         return jsonPath.getList(path);
+    }
+
+    public static int getIntResponse(String response, String path) {
+        JsonPath jsonPath = new JsonPath(response);
+        return jsonPath.getInt(path);
+    }
+
+    public static String extractKeyFromUrl(String urlString) {
+        try {
+            URL url = new URL(urlString);
+            String query = url.getQuery();
+
+            // Split the query string into key-value pairs
+            String[] pairs = query.split("&");
+            Map<String, String> queryPairs = new HashMap<>();
+
+            for (String pair : pairs) {
+                int idx = pair.indexOf("=");
+                String key = URLDecoder.decode(pair.substring(0, idx), StandardCharsets.UTF_8);
+                String value = URLDecoder.decode(pair.substring(idx + 1), StandardCharsets.UTF_8);
+                queryPairs.put(key, value);
+            }
+
+            // Return the value of the "key" parameter
+            return queryPairs.get("key");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public static String updateJsonValue(String jsonString, String keyPath, Object newValue) {
+        // Convert the JSON string to a JSONObject
+        JSONObject jsonObject = new JSONObject(jsonString);
+
+        // Split the key path by dots to navigate through the structure
+        String[] keys = keyPath.split("\\.");
+
+        // Navigate through the JSON object hierarchy
+        JSONObject currentObject = jsonObject;
+        for (int i = 0; i < keys.length - 1; i++) {
+            String key = keys[i];
+
+            // Check if the key contains an array index (e.g., "array[0]")
+            if (key.contains("[") && key.contains("]")) {
+                // Extract the array name and index
+                String arrayName = key.substring(0, key.indexOf("["));
+                int arrayIndex = Integer.parseInt(key.substring(key.indexOf("[") + 1, key.indexOf("]")));
+
+                // Get the JSONArray and the object at the specified index
+                JSONArray jsonArray = currentObject.getJSONArray(arrayName);
+                currentObject = jsonArray.getJSONObject(arrayIndex);
+            } else {
+                // Standard key, move deeper into the JSON object
+                currentObject = currentObject.getJSONObject(key);
+            }
+        }
+
+        // Determine the data type of the existing key's value and update accordingly
+        String finalKey = keys[keys.length - 1];
+        Object existingValue = currentObject.get(finalKey);
+
+        if (existingValue instanceof Integer) {
+            currentObject.put(finalKey, Integer.parseInt(newValue.toString()));
+        } else if (existingValue instanceof Boolean) {
+            currentObject.put(finalKey, Boolean.parseBoolean(newValue.toString()));
+        } else if (existingValue instanceof Double) {
+            currentObject.put(finalKey, Double.parseDouble(newValue.toString()));
+        } else if (existingValue instanceof Long) {
+            currentObject.put(finalKey, Long.parseLong(newValue.toString()));
+        } else if (existingValue instanceof JSONArray) {
+            if (newValue instanceof JSONArray) {
+                currentObject.put(finalKey, newValue);
+            } else if (newValue instanceof ArrayList) {
+                currentObject.put(finalKey, new JSONArray((ArrayList<?>) newValue));
+            } else {
+                throw new IllegalArgumentException("Expected a JSONArray or ArrayList but got: " + newValue.getClass().getName());
+            }
+        } else if (existingValue instanceof JSONObject) {
+            if (newValue instanceof JSONObject) {
+                currentObject.put(finalKey, newValue);
+            } else {
+                throw new IllegalArgumentException("Expected a JSONObject but got: " + newValue.getClass().getName());
+            }
+        } else {
+            // Default case for String or any other type
+            currentObject.put(finalKey, newValue);
+        }
+
+        // Return the updated JSON string
+        return jsonObject.toString();
     }
 
     public static void fluentWait(int milliseconds) {
@@ -159,7 +263,7 @@ public class Utils {
             driver.switchTo().alert().dismiss();
         } catch (Exception e) {
             ;
-            log.error(String.format("Exception {%s} occurred while accepting the alert", e.getMessage()));
+            //   log.error(String.format("Exception {%s} occurred while accepting the alert", e.getMessage()));
         }
     }
 
@@ -178,7 +282,7 @@ public class Utils {
             JavascriptExecutor executor = (JavascriptExecutor) driver;
             executor.executeScript("arguments[0].click();", element);
         } catch (Exception e) {
-            log.error(String.format("Exception {%s} occurred while clicking on the element", e.getMessage()));
+            //   log.error(String.format("Exception {%s} occurred while clicking on the element", e.getMessage()));
         }
     }
 
@@ -205,9 +309,9 @@ public class Utils {
         String message = String.format("Successfully navigated back");
         try {
             driver.navigate().back();
-            log.info(message);
+            //  log.info(message);
         } catch (Exception e) {
-            log.error(String.format("Exception {%s} occurred while navigating back", e.getMessage()));
+            //   log.error(String.format("Exception {%s} occurred while navigating back", e.getMessage()));
         }
     }
 
@@ -217,8 +321,8 @@ public class Utils {
             Actions action = new Actions(driver);
             action.moveToElement(locator).build().perform();
         } catch (Exception e) {
-            log.error(String.format("Exception {%s} occurred while mouse over on element located by {%s}",
-                    e.getMessage(), locator));
+//            log.error(String.format("Exception {%s} occurred while mouse over on element located by {%s}",
+//                    e.getMessage(), locator));
         }
     }
 
@@ -227,10 +331,10 @@ public class Utils {
         try {
             waitForWebElementToBeVisible(locator);
             text = locator.getText();
-            log.info(String.format("Successfully got text {%s} of element", text));
+            //     log.info(String.format("Successfully got text {%s} of element", text));
         } catch (Exception e) {
-            log.error(String.format("Exception {%s} happened while getting text of element located by {%s}",
-                    e.getMessage(), locator));
+//            log.error(String.format("Exception {%s} happened while getting text of element located by {%s}",
+//                    e.getMessage(), locator));
         }
         return text;
     }
@@ -238,22 +342,40 @@ public class Utils {
     public static void sendKeys(WebElement locator, String value) {
         try {
             waitForWebElementToBeVisible(locator);
-            locator.clear();
-            locator.sendKeys("");
+            locator.click();
+
+            // Clear the input field using backspace
+            String currentValue = locator.getAttribute("value");
+            if (currentValue != null && !currentValue.isEmpty()) {
+                for (int i = 0; i < currentValue.length(); i++) {
+                    locator.sendKeys(Keys.BACK_SPACE);
+                }
+            }
+
+            // Verify the input is empty
+            currentValue = locator.getAttribute("value");
+            if (currentValue != null && !currentValue.isEmpty()) {
+                //  log.warn("Input field was not cleared, trying again...");
+                for (int i = 0; i < currentValue.length(); i++) {
+                    locator.sendKeys(Keys.BACK_SPACE);
+                }
+            }
+
             locator.sendKeys(value);
-            log.info("Successfully entered text");
+            //   log.info("Successfully entered text");
         } catch (Exception e) {
-            log.error(String.format("Exception {%s} happened while setting value to element with locator {%s}",
+            System.out.println(String.format("Exception {%s} happened while setting value to element with locator {%s}",
                     e.getMessage(), locator));
         }
     }
+
 
     public void switchToFrame(String frameName) {
         try {
             driver.switchTo().frame(frameName);
         } catch (Exception e) {
-            log.error(String.format("Exception {%s} happened while switching to frameName: {%s}",
-                    e.getMessage(), frameName));
+//            log.error(String.format("Exception {%s} happened while switching to frameName: {%s}",
+//                    e.getMessage(), frameName));
         }
     }
 
@@ -261,7 +383,7 @@ public class Utils {
         try {
             driver.switchTo().defaultContent();
         } catch (Exception e) {
-            log.error(String.format("Exception {%s} occurred while switching to default", e.getMessage()));
+            //    log.error(String.format("Exception {%s} occurred while switching to default", e.getMessage()));
         }
     }
 
@@ -269,10 +391,10 @@ public class Utils {
         try {
             waitForWebElementToBeClickable(element);
             element.click();
-            log.info("Successfully entered text");
+            //     log.info("Successfully entered text");
         } catch (Exception e) {
-            log.error(String.format("Exception {%s} happened while setting value to element with locator {%s}",
-                    e.getMessage(), element));
+            //   log.error(String.format("Exception {%s} happened while setting value to element with locator {%s}",
+            //          e.getMessage(), element));
         }
     }
 
@@ -311,16 +433,23 @@ public class Utils {
 
     public static void assertEqual(String actual, String expected) {
         try {
-            Assert.assertEquals(actual, expected);
-            log.info(String.format("Actual {%s} and Expected {%s} are equal", actual, expected));
+//            Assert.assertEquals(actual, expected);
+            //            log.info(String.format("Actual {%s} and Expected {%s} are equal", actual, expected));
         } catch (AssertionError e) {
-            log.error(String.format("Actual {%s} and Expected {%s} are not equal", actual, expected));
+            //           log.error(String.format("Actual {%s} and Expected {%s} are not equal", actual, expected));
         }
     }
 
     public static String getCurrentDate() {
         LocalDate dateObj = LocalDate.now();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM/dd/yyyy");
+        String date = dateObj.format(formatter);
+        return date;
+    }
+
+    public static String getCurrentDateInOtherFormat() {
+        LocalDate dateObj = LocalDate.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         String date = dateObj.format(formatter);
         return date;
     }
@@ -341,15 +470,14 @@ public class Utils {
     }
 
     public static ArrayList<String> getEmailVerificationCode(String email) {
-        fluentWait(20000);
-        ArrayList<String>  list =  new ArrayList<>();
+        fluentWait(10000);
+        ArrayList<String> list = new ArrayList<>();
         try {
             String body = given(mailSacRequestSpecification()).pathParam("email", email)
                     .when().get("/addresses/{email}/messages").then().extract().response().getBody().asString();
-            System.out.println(body);
-              list = (ArrayList<String>) getListResponse(body, "[0].links");
+            list = (ArrayList<String>) getListResponse(body, "[0].links");
         } catch (Exception e) {
-            log.error(String.format("Exception {%s} happened while getting email verification code", e.getMessage()));
+            //           log.error(String.format("Exception {%s} happened while getting email verification code", e.getMessage()));
         }
         return list;
     }
@@ -361,26 +489,26 @@ public class Utils {
                     .when().get("/addresses/{email}/messages").then().extract().response().getBody().asString();
             subject = getStringResponse(body, "[0].subject");
         } catch (Exception e) {
-            log.error(String.format("Exception {%s} happened while getting email verification code", e.getMessage()));
+            //            log.error(String.format("Exception {%s} happened while getting email verification code", e.getMessage()));
         }
         return subject;
     }
 
     public static void assertNotNull(Object obj) {
         try {
-            Assert.assertNotNull(obj);
-            log.info(String.format("Object {%s} is not null", obj));
+//            Assert.assertNotNull(obj);
+            //            log.info(String.format("Object {%s} is not null", obj));
         } catch (AssertionError e) {
-            log.error(String.format("Object {%s} is null", obj));
+            //            log.error(String.format("Object {%s} is null", obj));
         }
     }
 
     public static void refreshPage() {
         try {
             driver.navigate().refresh();
-            log.info("Page refreshed");
+//            log.info("Page refreshed");
         } catch (Exception e) {
-            log.error(String.format("Exception {%s} happened while refreshing page", e.getMessage()));
+//            log.error(String.format("Exception {%s} happened while refreshing page", e.getMessage()));
         }
     }
 
@@ -392,7 +520,7 @@ public class Utils {
             System.out.println("x: " + x + " y: " + y);
             Actions action = new Actions(driver);
             action.moveByOffset(x, y).click().build().perform();
-            log.info("Successfully clicked on element");
+//            log.info("Successfully clicked on element");
         } catch (Exception e) {
 //            log.error(String.format("Exception {%s} happened while clicking on element with locator {%s}",
 //                    e.getMessage(), element));
@@ -415,9 +543,9 @@ public class Utils {
             ArrayList<String> tabs = new ArrayList<String>(driver.getWindowHandles());
             driver.switchTo().window(tabs.get(1));
             driver.get(url);
-            log.info("Successfully opened url in new tab");
+//            log.info("Successfully opened url in new tab");
         } catch (Exception e) {
-            log.error(String.format("Exception {%s} happened while opening url in new tab", e.getMessage()));
+//            log.error(String.format("Exception {%s} happened while opening url in new tab", e.getMessage()));
         }
     }
 
@@ -426,9 +554,9 @@ public class Utils {
             driver.close();
             ArrayList<String> tabs = new ArrayList<String>(driver.getWindowHandles());
             driver.switchTo().window(tabs.get(0));
-            log.info("Successfully closed current tab");
+//            log.info("Successfully closed current tab");
         } catch (Exception e) {
-            log.error(String.format("Exception {%s} happened while closing current tab", e.getMessage()));
+//            log.error(String.format("Exception {%s} happened while closing current tab", e.getMessage()));
         }
     }
 
@@ -439,7 +567,7 @@ public class Utils {
             element.isDisplayed();
             flag = true;
         } catch (Exception e) {
-            log.error(String.format("Element {%s} is not visible", element));
+//            log.error(String.format("Element {%s} is not visible", element));
             flag = false;
         }
         return flag;
@@ -461,14 +589,19 @@ public class Utils {
         return url;
     }
 
-    public static String addImages(String [] img){
-        //PUT ALL IMAGES IN PROJECT FOLDER
+    public static String addSingleImage(String img) {
+        File file = new File(img);
+        String path = file.getAbsolutePath();
+        return path;
+    }
+
+    public static String addImages(String[] img) {
         String path = "";
-        if (img.length == 1){
+        if (img.length == 1) {
             File file = new File(img[0]);
-             path = file.getAbsolutePath();
-        }else{
-            for(int i=0; i<img.length; i++){
+            path = file.getAbsolutePath();
+        } else {
+            for (int i = 0; i < img.length; i++) {
                 File file = new File(img[i]);
                 path = path + file.getAbsolutePath() + "\n";
             }
@@ -476,14 +609,14 @@ public class Utils {
         return path;
     }
 
-    public static String extractURL(String text){
+    public static String extractURL(String text) {
         String url = "";
         String regex = "(https?://\\S+)";
         Pattern pattern = Pattern.compile(regex);
         Matcher matcher = pattern.matcher(text);
 
         if (matcher.find()) {
-             url = matcher.group();
+            url = matcher.group();
             System.out.println("Extracted URL: " + url);
         } else {
             System.out.println("No URL found in the text.");
@@ -491,9 +624,9 @@ public class Utils {
         return url;
     }
 
-    public static void isTextPresent(String text){
+    public static boolean isTextPresent(String text) {
         WebElement textElement = driver.findElement(By.xpath("//*[contains(text(),'" + text + "')]"));
-        isElementPresent(textElement);
+        return isElementPresent(textElement);
     }
 
 

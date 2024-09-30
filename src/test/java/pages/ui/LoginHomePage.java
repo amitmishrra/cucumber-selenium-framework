@@ -5,14 +5,9 @@ import org.openqa.selenium.*;
 import org.openqa.selenium.support.FindBy;
 import org.openqa.selenium.support.How;
 import org.openqa.selenium.support.PageFactory;
-import org.openqa.selenium.support.ui.ExpectedConditions;
-import org.openqa.selenium.support.ui.FluentWait;
-import org.openqa.selenium.support.ui.WebDriverWait;
-import org.testng.Assert;
 import stepdefintions.CommonVariablesAndMethods;
 
-import java.time.Duration;
-import java.util.List;
+import java.io.IOException;
 
 import static common.Utils.*;
 import static stepdefintions.CommonVariablesAndMethods.*;
@@ -42,25 +37,14 @@ public class LoginHomePage {
         this.utils = new Utils(driver);
     }
 
+    public void navigate() throws IOException {
+        driver.get(getPropertyData("ui.baseurl"));
+    }
+
     public void loginPage(String username, String password) {
         sendKeys(emailText, username);
         sendKeys(passwordText, password + Keys.ENTER);
 
-        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
-        By termsOfUseLocator = By.xpath("//*[text()='Kaliber Labs Terms of Use']");
-        WebElement termsOfUseElement = null;
-
-        try {
-            termsOfUseElement = wait.until(ExpectedConditions.visibilityOfElementLocated(termsOfUseLocator));
-        } catch (TimeoutException e) {
-            System.out.println("No terms and conditions checkbox");
-        }
-
-        if (termsOfUseElement != null) {
-            fluentWait(5000);
-           driver.findElement(By.xpath("//*[@class='jss4']")).click();
-            driver.findElement(By.xpath("//*[text()='Continue']")).click();
-        }
     }
 }
 
